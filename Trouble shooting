@@ -1,22 +1,28 @@
 Here are some helpful sources you can refer to for troubleshooting during your Maven, RestAssured, Allure, and JUnit integration setup:
 
-	1.	Maven Surefire Plugin:
+	
+1.	Maven Surefire Plugin:
 	•	Troubleshooting issues with test execution, parallel testing, and configuration of profiles.
-	•	Official documentation: Maven Surefire Plugin Docs
-	2.	Allure Reporting:
+	•	Official documentation: Maven Surefire Plugin Docs - https://maven.apache.org/surefire/maven-surefire-plugin/
+	
+2.	Allure Reporting:
 	•	Common issues with integrating Allure reports, generating, and serving reports.
-	•	Troubleshooting and setup guidance: Allure Framework Documentation
-	3.	RestAssured:
+	•	Troubleshooting and setup guidance: Allure Framework Documentation - https://allurereport.org/docs/
+	
+3.	RestAssured:
 	•	Issues with testing APIs, handling dynamic URLs, and troubleshooting RestAssured filters.
-	•	RestAssured official documentation: RestAssured Documentation
-	4.	Baeldung’s Guide on JUnit and Parallel Tests:
+	•	RestAssured official documentation: RestAssured Documentation - https://rest-assured.io/
+	
+4.	Baeldung’s Guide on JUnit and Parallel Tests:
 	•	Detailed tutorials on using JUnit, Maven Surefire, and parallel test execution.
-	•	JUnit Parallel Tests with Maven ￼
-	5.	SW Test Academy - Allure Report with TestNG:
+	•	JUnit Parallel Tests with Maven ￼- https://www.baeldung.com/maven-junit-parallel-tests
+	
+5.	SW Test Academy - Allure Report with TestNG:
 	•	Detailed step-by-step tutorial on setting up Allure with Maven for automated test reporting.
-	•	SW Test Academy Guide on Allure ￼
-	6.	QA Automation Expert – Allure with RestAssured:
+	•	SW Test Academy Guide on Allure ￼- https://www.swtestacademy.com/allure-report-testng/
+	
+6.	QA Automation Expert – Allure with RestAssured:
 	•	Integration guide for Allure with RestAssured and TestNG (applicable even for JUnit users).
-	•	QA Automation Expert Guide ￼
+	•	QA Automation Expert Guide ￼- https://qaautomation.expert/2023/10/05/integration-of-allure-report-with-rest-assured-and-testng/
 
 These resources provide comprehensive guides and troubleshooting tips to ensure a smooth testing and reporting setup.
