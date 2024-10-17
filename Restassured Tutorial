@@ -1,0 +1,107 @@
+To set up a Maven-based project that dynamically runs tests across multiple REST services with different configurations and generates Allure reports, here’s an overview of the steps involved:
+
+1. Project Structure
+
+Ensure your Maven project follows a standard folder structure with test classes, configuration files, and test data separated for maintainability.
+
+2. Maven POM Configuration
+
+In the pom.xml, you will include dependencies for JUnit 5, RestAssured, and Allure, along with the Maven Surefire Plugin for executing tests. You will define profiles for each configuration (e.g., different websites or environments).
+
+Example:
+
+<profiles>
+    <profile>
+        <id>website1</id>
+        <properties>
+            <configFile>src/test/resources/config_website1.properties</configFile>
+        </properties>
+    </profile>
+
+    <profile>
+        <id>website2</id>
+        <properties>
+            <configFile>src/test/resources/config_website2.properties</configFile>
+        </properties>
+    </profile>
+</profiles>
+
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>3.0.0-M5</version>
+        </plugin>
+
+        <plugin>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-maven</artifactId>
+            <version>2.10.0</version>
+        </plugin>
+    </plugins>
+</build>
+
+
+
+3. Test Configuration Files
+
+For each website, create a properties file that specifies the base URL and endpoints for the REST services.
+
+config_website1.properties:
+
+base.url=https://api.website1.com
+year.endpoint=/year/{year}
+model.endpoint=/model/{model}
+
+4. Test Data Files
+
+Use CSV files to store test input and expected results, such as vehicle years or models.
+
+year_test_data.csv:
+
+year,expectedStatusCode,expectedYear
+1995,200,1995
+2000,200,2000
+2023,404,null
+
+
+5. JUnit and RestAssured Test Class
+
+In the test class, dynamically load the base URL and endpoints from the properties files. Use JUnit 5 for parameterized tests, which read input from the CSV files.
+
+Example Test Code:
+
+
+@ParameterizedTest
+@CsvFileSource(resources = "/year_test_data.csv", numLinesToSkip = 1)
+void testGetVehicleByYear(int year, int expectedStatusCode, String expectedYear) {
+    RestAssured.baseURI = baseUrl;
+
+    Response response = given()
+        .pathParam("year", year)
+        .when()
+        .get(yearEndpoint)
+        .then()
+        .statusCode(expectedStatusCode)
+        .extract().response();
+
+    if (expectedYear != null) {
+        response.then().body("year", equalTo(Integer.parseInt(expectedYear)));
+    }
+}
+
+
+6. Running All Tests and Generating Allure Reports
+
+You can run all tests for different configurations and generate Allure reports in one command using:
+
+mvn test allure:serve
+
+This will execute tests across both website1 and website2 profiles, and Allure will generate a report immediately after the test run. To see the Allure report, use the allure:serve command, which opens an interactive HTML report.
+
+Detailed Resources:
+
+	•	For more on integrating Allure with Maven and RestAssured: QA Automation Expert.
+	•	For detailed Maven profile setup and test parallelization: Baeldung.
+	•	For a guide to generating Allure reports: SW Test Academy.
