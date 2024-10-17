@@ -1,0 +1,618 @@
+To set up a detailed dynamic test case for your MicroProfile REST application with endpoints /year/{year} and /model/{model} that return lists of cars, I’ll guide you through:
+
+	•	Creating the test case with all required configurations.
+	•	Using test data and expected results in separate files.
+	•	Generating Allure reports automatically after tests are executed.
+
+1. Folder Structure
+
+project-root
+│
+├── src
+│   ├── main
+│   │   └── java
+│   │       └── com
+│   │           └── example
+│   │               └── carapi
+│   │                   ├── Car.java
+│   │                   ├── CarService.java
+│   │                   ├── CarResource.java
+│   │
+│   └── test
+│       └── java
+│           └── com
+│               └── example
+│                   └── carapi
+│                       └── CarApiTest.java
+│       └── resources
+│           ├── config_website1.properties
+│           ├── config_website2.properties
+│           ├── year_test_data.csv
+│           └── model_test_data.csv
+├── pom.xml
+└── README.md
+
+
+2. pom.xml Configuration
+
+In pom.xml, you’ll include dependencies for MicroProfile, JUnit 5, RestAssured, and Allure for testing and reporting.
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>car-api</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <!-- MicroProfile Dependencies -->
+        <dependency>
+            <groupId>org.eclipse.microprofile</groupId>
+            <artifactId>microprofile</artifactId>
+            <version>4.0</version>
+        </dependency>
+
+        <!-- JUnit 5 -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.7.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.7.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- RestAssured -->
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <version>4.5.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Allure RestAssured -->
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-rest-assured</artifactId>
+            <version>2.13.9</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Allure JUnit 5 -->
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-junit5</artifactId>
+            <version>2.13.9</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Maven Surefire Plugin for running tests -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.0.0-M5</version>
+            </plugin>
+
+            <!-- Allure Maven Plugin -->
+            <plugin>
+                <groupId>io.qameta.allure</groupId>
+                <artifactId>allure-maven</artifactId>
+                <version>2.13.9</version>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>website1</id>
+            <properties>
+                <configFile>src/test/resources/config_website1.properties</configFile>
+            </properties>
+        </profile>
+
+        <profile>
+            <id>website2</id>
+            <properties>
+                <configFile>src/test/resources/config_website2.properties</configFile>
+            </properties>
+        </profile>
+    </profiles>
+</project>
+
+
+3. Configuration Files
+
+These files help manage configurations for different environments (e.g., different base URLs).
+
+config_website1.properties
+
+base.url=http://localhost:8080
+year.endpoint=/year/{year}
+model.endpoint=/model/{model}
+
+config_website2.properties
+
+base.url=http://localhost:8081
+year.endpoint=/year/{year}
+model.endpoint=/model/{model}
+
+4. Test Data Files
+
+The CSV files store the test input and expected results.
+
+year_test_data.csv
+
+year,expectedStatusCode,expectedYear
+1995,200,1995
+2000,200,2000
+2023,404,null
+
+model_test_data.csv
+
+model,expectedStatusCode,expectedMake,expectedModel,expectedYear
+Accord,200,Honda,Accord,2010
+Camry,200,Toyota,Camry,2015
+Unknown,404,null,null,null
+
+5. MicroProfile REST Resources (CarResource.java)
+
+@Path("/cars")
+@Produces(MediaType.APPLICATION_JSON)
+public class CarResource {
+
+    @Inject
+    CarService carService;
+
+    @GET
+    @Path("/year/{year}")
+    public Response getCarsByYear(@PathParam("year") int year) {
+        List<Car> cars = carService.getCarsByYear(year);
+        if (cars.isEmpty()) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        return Response.ok(cars).build();
+    }
+
+    @GET
+    @Path("/model/{model}")
+    public Response getCarsByModel(@PathParam("model") String model) {
+        List<Car> cars = carService.getCarsByModel(model);
+        if (cars.isEmpty()) {
+            return Response.status(Response.Status.NOT_FOUND).build();
+        }
+        return Response.ok(cars).build();
+    }
+}
+
+
+6. Car Service (CarService.java)
+
+@ApplicationScoped
+public class CarService {
+
+    private List<Car> cars = new ArrayList<>(Arrays.asList(
+            new Car("Honda", "Accord", 2010),
+            new Car("Toyota", "Camry", 2015),
+            new Car("Ford", "Mustang", 2000)
+    ));
+
+    public List<Car> getCarsByYear(int year) {
+        return cars.stream().filter(car -> car.getYear() == year).collect(Collectors.toList());
+    }
+
+    public List<Car> getCarsByModel(String model) {
+        return cars.stream().filter(car -> car.getModel().equalsIgnoreCase(model)).collect(Collectors.toList());
+    }
+}
+
+7. Car Model (Car.java)
+
+public class Car {
+    private String make;
+    private String model;
+    private int year;
+
+    // Constructors, getters, setters
+
+    public Car(String make, String model, int year) {
+        this.make = make;
+        this.model = model;
+        this.year = year;
+    }
+
+    // Getters and Setters
+}
+
+8. JUnit 5 and RestAssured Test Code (CarApiTest.java)
+
+This test class dynamically loads the configuration files and runs tests for both endpoints.
+
+import io.restassured.RestAssured;
+import io.restassured.response.Response;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvFileSource;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.equalTo;
+
+public class CarApiTest {
+
+    private static String baseUrl;
+    private static String yearEndpoint;
+    private static String modelEndpoint;
+
+    @BeforeAll
+    public static void setup() throws IOException {
+        String configFile = System.getProperty("configFile", "src/test/resources/config_website1.properties");
+
+        Properties properties = new Properties();
+        FileInputStream configStream = new FileInputStream(configFile);
+        properties.load(configStream);
+
+        baseUrl = properties.getProperty("base.url");
+        yearEndpoint = properties.getProperty("year.endpoint");
+        modelEndpoint = properties.getProperty("model.endpoint");
+    }
+
+    @ParameterizedTest
+    @CsvFileSource(resources = "/year_test_data.csv", numLinesToSkip = 1)
+    void testGetCarByYear(int year, int expectedStatusCode, String expectedYear) {
+        RestAssured.baseURI = baseUrl;
+
+        Response response = given()
+            .pathParam("year", year)
+            .when()
+            .get(yearEndpoint)
+            .then()
+            .statusCode(expectedStatusCode)
+            .extract()
+.response();
+
+        if (expectedYear != null) {
+            response.then().body("year", equalTo(Integer.parseInt(expectedYear)));
+        }
+    }
+
+    @ParameterizedTest
+    @CsvFileSource(resources = "/model_test_data.csv", numLinesToSkip = 1)
+    void testGetCarByModel(String model, int expectedStatusCode, String expectedMake, String expectedModel, String expectedYear) {
+        RestAssured.baseURI = baseUrl;
+
+        Response response = given()
+            .pathParam("model", model)
+            .when()
+            .get(modelEndpoint)
+            .then()
+            .statusCode(expectedStatusCode)
+            .extract().response();
+
+        if (expectedMake != null && expectedModel != null && expectedYear != null) {
+            response.then().body("make", equalTo(expectedMake))
+                    .body("model", equalTo(expectedModel))
+                    .body("year", equalTo(Integer.parseInt(expectedYear)));
+        }
+    }
+}
+
+
+9. One-Step Execution with Allure Report
+
+To execute all tests across different configurations and generate Allure reports in one command:
+
+mvn test allure:serve
+
+This command will:
+
+	1.	Run all tests using the defined profiles (e.g., website1, website2).
+	2.	Generate the Allure report and serve it automatically.
+
+Conclusion
+
+This setup allows for:
+
+	•	Dynamic testing of a MicroProfile REST application using separate configuration files for different environments.
+	•	Parameterized tests with external data files (CSV).
+	•	Automated report generation using Allure.
+
+You can further extend the pipeline by adding more profiles, data-driven tests, and using other advanced Maven plugins for continuous integration and deployment.
+
+
+
+To set up and execute the tests, report generation, and dynamic configuration for your MicroProfile REST application using Maven, JUnit 5, RestAssured, and Allure, follow these steps:
+
+1. Setting up the Project
+
+You have the MicroProfile REST application and you want to automate testing, configuration, and report generation. Here’s how you can do it:
+
+2. Step-by-Step Guide
+
+Step 1: Create a Maven Project
+
+You already have your pom.xml set up with all necessary dependencies for JUnit 5, RestAssured, and Allure. Make sure your project structure matches the typical Maven layout (as outlined in the previous response).
+
+	1.	Create the Folder Structure:
+	•	Ensure your code is in src/main/java/com/example/carapi/ for the MicroProfile application.
+	•	Put test classes under src/test/java/com/example/carapi/.
+	2.	Add Dependencies:
+	•	Add JUnit 5, RestAssured, and Allure in your pom.xml.
+
+Step 2: Write Your Test Cases
+
+Your test cases are in CarApiTest.java and are using the dynamic configurations stored in config_website1.properties and config_website2.properties.
+
+	•	Parameterized Test for /year/{year} and /model/{model} endpoints.
+	•	Load test data from CSV files (year_test_data.csv and model_test_data.csv).
+
+Test Example for /year/{year}:
+
+@ParameterizedTest
+@CsvFileSource(resources = "/year_test_data.csv", numLinesToSkip = 1)
+void testGetCarByYear(int year, int expectedStatusCode, String expectedYear) {
+    RestAssured.baseURI = baseUrl;
+
+    Response response = given()
+        .pathParam("year", year)
+        .when()
+        .get(yearEndpoint)
+        .then()
+        .statusCode(expectedStatusCode)
+        .extract().response();
+
+    if (expectedYear != null) {
+        response.then().body("year", equalTo(Integer.parseInt(expectedYear)));
+    }
+}
+
+Step 3: Configure Maven Surefire Plugin for Running Tests
+
+Maven Surefire is the plugin responsible for running the tests during the build process.
+
+	•	Ensure that your pom.xml is set up to run JUnit 5 tests using the Surefire plugin.
+
+<plugin>
+    <groupId>org.apache.maven.plugins</groupId>
+    <artifactId>maven-surefire-plugin</artifactId>
+    <version>3.0.0-M5</version>
+    <configuration>
+        <includes>
+            <include>**/*Test.java</include>
+        </includes>
+    </configuration>
+</plugin>
+
+
+Step 4: Use Maven Profiles for Different Environments
+
+You have two profiles (website1 and website2) set up in your pom.xml. These allow you to run the tests in different environments with different configurations.
+
+To run the tests for website1:
+
+mvn test -Pwebsite1
+
+To run the tests for website2:
+
+mvn test -Pwebsite2
+
+This ensures the correct configurations are loaded during test execution.
+
+Step 5: Allure Report Configuration
+
+The Allure Maven Plugin allows you to generate beautiful reports after your tests are executed.
+
+After adding Allure to your pom.xml, use the following command to generate and serve Allure reports:
+
+mvn test allure:serve
+
+This will:
+
+	•	Run all tests across your profiles.
+	•	Automatically generate and open the Allure report in a web browser.
+
+Step 6: Automate Execution with Jenkins (Optional)
+
+If you’re using Jenkins for Continuous Integration (CI), you can set up a Jenkins pipeline (as discussed previously) to automatically:
+
+	1.	Build the application.
+	2.	Run tests with different configurations.
+	3.	Generate Allure reports after the tests.
+
+3. One-Step Execution
+
+To execute all tests with both profiles and generate the Allure report, use this single command:
+
+mvn test allure:serve
+
+4. Troubleshooting & Resources
+
+If you encounter issues, here are some common troubleshooting steps:
+
+	•	JUnit Tests Not Detected: Ensure you’re using the correct version of the Surefire plugin, and that the test files end with Test.java.
+	•	Allure Report Not Generating: Check that the allure-results directory is being generated. Ensure that the Allure plugin is installed if using Jenkins.
+
+Useful Resources:
+
+	•	Allure Framework Documentation
+	•	JUnit 5 Documentation
+	•	RestAssured Documentation
+
+This setup enables you to automate testing, generate reports, and dynamically switch configurations for testing across different environments.
+
+
+JENKINS CONFIGURATION
+
+To configure Jenkins for your MicroProfile project to execute tests after build and deploy, follow these steps:
+
+1. Prerequisites
+
+	•	Jenkins is installed and running.
+	•	Jenkins has the following plugins installed:
+	•	Maven Integration Plugin: Required to run Maven commands.
+	•	Allure Plugin: For test reporting.
+	•	JUnit Plugin: For test result reports.
+
+2. Create a Jenkins Pipeline Job
+
+In Jenkins, you can create a pipeline that handles the build, test, and deploy stages of your MicroProfile application. We will configure the pipeline with Maven to run tests and generate reports using JUnit and Allure.
+
+3. Jenkinsfile Configuration
+
+Create a Jenkinsfile in the root of your project. This file will define the steps Jenkins will follow during the pipeline execution.
+
+pipeline {
+    agent any
+
+    environment {
+        // Set environment variables such as the Allure report directory
+        ALLURE_RESULTS = 'target/allure-results'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Checkout code from your repository (e.g., GitHub, GitLab)
+                git 'https://github.com/your-repo.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                // Build the application using Maven
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Run Unit Tests') {
+            steps {
+                // Run unit and integration tests
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    // Archive test results
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                // Deploy the application (e.g., to a server, Docker, Kubernetes)
+                // Customize this based on your deployment strategy
+                sh 'mvn deploy'
+            }
+        }
+
+        stage('Post-Deploy Test') {
+            steps {
+                // Run post-deployment tests after deploying the app
+                // This can involve hitting the MicroProfile REST endpoints
+                sh 'mvn test -Ppost-deploy-tests'
+            }
+            post {
+                always {
+                    // Archive post-deployment test results
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Generate Allure report
+            allure includeResults: true, results: [[path: "${ALLURE_RESULTS}"]]
+        }
+    }
+}
+
+4. Explanation of the Jenkinsfile
+
+	1.	Checkout: Jenkins checks out the code from your repository (GitHub, GitLab, etc.).
+	2.	Build: The project is built using mvn clean package. This compiles your MicroProfile project.
+	3.	Run Unit Tests: Unit and integration tests are executed using mvn test. Test results are archived using the JUnit plugin.
+	4.	Deploy: The application is deployed. You can customize this step to deploy to your server, Docker container, or Kubernetes cluster.
+	5.	Post-Deploy Test: After deployment, additional tests are run against the deployed application (e.g., API endpoint tests). These tests validate the behavior in the live environment.
+	6.	Allure Reports: Allure reports are generated after the pipeline finishes, using the results stored in the target/allure-results folder.
+
+5. Maven Profiles for Testing
+
+Ensure your pom.xml includes Maven profiles that distinguish between pre-deploy and post-deploy testing.
+
+<profiles>
+    <profile>
+        <id>default</id>
+        <build>
+            <plugins>
+                <!-- Maven Surefire Plugin configuration -->
+            </plugins>
+        </build>
+    </profile>
+
+    <profile>
+        <id>post-deploy-tests</id>
+        <build>
+            <plugins>
+                <!-- Use this profile to run tests against deployed endpoints -->
+            </plugins>
+        </build>
+    </profile>
+</profiles>
+
+6. Jenkins Pipeline Setup
+
+	1.	Create a New Pipeline Job:
+	•	Open Jenkins and click New Item.
+	•	Select Pipeline and name your job (e.g., MicroProfileAppPipeline).
+	2.	Set Up the Pipeline:
+	•	Under Pipeline settings, choose the Pipeline script from SCM option.
+	•	Configure the SCM (e.g., Git) and point it to your repository.
+	•	Ensure the Script Path points to the Jenkinsfile (in the root of your repository).
+	3.	Save the Job.
+
+7. Running the Pipeline
+
+Once you’ve set up the Jenkins job:
+
+	1.	Trigger the pipeline manually or set it to trigger automatically (e.g., using webhooks from GitHub/GitLab).
+	2.	Jenkins will execute the pipeline, run the tests, deploy the app, and run post-deployment tests.
+	3.	Test results and reports will be available under the Jenkins job, with detailed Allure and JUnit reports.
+
+8. Reporting with Allure and JUnit
+
+Make sure the JUnit and Allure plugins are installed in Jenkins:
+
+	1.	JUnit Plugin: Automatically archives test results in Jenkins.
+	2.	Allure Plugin: Generates detailed reports of the test execution.
+
+You can view test results and reports in the Jenkins UI after the pipeline run.
+
+9. Advanced Deployment
+
+If you are deploying to Docker or Kubernetes, you can replace the deploy step with the relevant commands. For example, for Docker:
+
+groovy code
+
+sh 'docker build -t your-image-name .'
+sh 'docker run -d -p 8080:8080 your-image-name'
+
+Or, for Kubernetes: groovy
+
+sh 'kubectl apply -f kubernetes-deployment.yaml'
+
+
+
