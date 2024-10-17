@@ -1,0 +1,142 @@
+Jenkins pipeline that will test your Spring Boot REST application after the build and deployment phases, you need to follow several steps. Here’s how you can set up the Jenkins pipeline using the Declarative Pipeline syntax:
+
+1. Jenkins Pipeline Configuration
+
+In your Jenkinsfile, define the stages that will handle the following tasks:
+
+	1.	Build: Compiles and builds the Spring Boot application.
+	2.	Test: Runs unit and integration tests (including the API tests).
+	3.	Deploy: Deploys the application (e.g., to a staging or production environment).
+	4.	Post-deploy Test: Runs the tests again after deployment to ensure the application works in the target environment.
+
+Sample Jenkinsfile:
+
+pipeline {
+    agent any
+
+    environment {
+        // Set environment variables such as the Allure report directory
+        ALLURE_RESULTS = 'target/allure-results'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Checkout code from your repository
+                git 'https://github.com/your-repo.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                // Build the application using Maven
+                sh 'mvn clean package'
+            }
+        }
+
+        stage('Run Unit Tests') {
+            steps {
+                // Run unit tests
+                sh 'mvn test'
+            }
+            post {
+                always {
+                    // Always archive test results
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Run Integration Tests') {
+            steps {
+                // Run integration and API tests (using Allure for reporting)
+                sh 'mvn verify'
+            }
+            post {
+                always {
+                    // Archive the Allure results
+                    allure includeResults: true, results: [[path: "${ALLURE_RESULTS}"]]
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                // Deploy the app (custom deployment logic)
+                // This could be deploying to a remote server, AWS, Kubernetes, etc.
+                // Example: Deploy to Docker or Kubernetes
+                sh 'mvn deploy'
+            }
+        }
+
+        stage('Post-Deploy Test') {
+            steps {
+                // Run post-deployment tests (API tests) after deploying the app
+                sh 'mvn test -Ppost-deploy-tests'
+            }
+            post {
+                always {
+                    // Archive post-deployment test results
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            // Archive the Allure report after all stages
+            allure includeResults: true, results: [[path: "${ALLURE_RESULTS}"]]
+        }
+    }
+}
+
+Explanation:
+
+	•	Checkout: Pulls the source code from a Git repository.
+	•	Build: Uses mvn clean package to compile and build the application.
+	•	Run Unit Tests: Executes unit tests using mvn test and collects test reports (junit plugin for JUnit XML reports).
+	•	Run Integration Tests: Runs integration/API tests using mvn verify and collects Allure results.
+	•	Deploy: Deploys the built application to a staging or production environment. This can involve deploying to Docker, Kubernetes, AWS, etc. You can customize the mvn deploy step to suit your deployment setup.
+	•	Post-Deploy Test: Runs additional tests after deployment to ensure the application is functioning in the production or staging environment.
+
+2. Jenkins Setup for Allure:
+
+	1.	Install Plugins:
+	•	Allure Jenkins Plugin: This is required to visualize Allure reports in Jenkins. Go to Manage Jenkins > Plugins > Available and install Allure Jenkins Plugin.
+	•	JUnit Plugin: This is used to report JUnit test results.
+	2.	Configure Allure in Jenkins:
+	•	After installing the plugin, configure Allure in your job or pipeline using post actions as shown in the pipeline script (allure includeResults: true, results: [[path: "${ALLURE_RESULTS}"]]).
+
+3. Post-Build and Post-Deploy Testing:
+
+The post-deploy testing ensures that your application is working correctly after deployment. This can include hitting your /year/{year} and /model/{model} endpoints and verifying responses using RestAssured.
+
+The tests should be located in your src/test/java directory and should include parameterized tests that validate the API responses, as demonstrated earlier in the VehicleApiTest.java.
+
+4. One-Step Execution:
+
+Once your Jenkinsfile is configured and checked into your repository, Jenkins will automatically detect changes and trigger a pipeline run. This pipeline will:
+
+	•	Build the application.
+	•	Run unit and integration tests.
+	•	Deploy the application.
+	•	Run post-deploy tests.
+	•	Generate Allure reports.
+
+5. Adding Deployment Logic:
+
+If you’re deploying to Docker, Kubernetes, or another platform, you can replace the mvn deploy command with the appropriate command for your environment. For example:
+
+	•	For Docker, you could use docker build and docker push.
+	•	For Kubernetes, you might apply a Kubernetes manifest using kubectl apply.
+
+6. Triggering the Pipeline After a Push:
+
+	•	Set up a webhook in your Git repository (GitHub, GitLab, Bitbucket, etc.) to trigger a Jenkins build automatically when code is pushed.
+
+Additional Resources:
+
+	•	Jenkins pipeline syntax: Jenkins Pipeline Syntax
+	•	Allure Jenkins Plugin: Allure Jenkins Plugin
+	•	Running Jenkins with Docker: Running Jenkins in Docker
