@@ -1,0 +1,71 @@
+import io.restassured.RestAssured;
+import io.restassured.response.Response;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.equalTo;
+
+public class ApiTest {
+
+    @ParameterizedTest
+    @CsvSource({
+        "1, John",
+        "2, Jane",
+        "3, Mark"
+    })
+    void testGetUserById(int userId, String expectedName) {
+        RestAssured.baseURI = "https://jsonplaceholder.typicode.com";
+
+        Response response = given()
+            .pathParam("id", userId)
+            .when()
+            .get("/users/{id}")
+            .then()
+            .statusCode(200)
+            .body("name", equalTo(expectedName))
+            .extract().response();
+
+        System.out.println(response.asString());
+    }
+}
+
+In this test, different user IDs and expected names are passed as parameters using @CsvSource. The test checks if the user names match the expected values for the given user IDs.
+
+
+import io.restassured.RestAssured;
+import io.restassured.response.Response;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.equalTo;
+
+public class VehicleApiTest {
+
+    @ParameterizedTest
+    @ValueSource(ints = {1995, 2000, 2005, 2010, 2015, 2020, 2021, 2022, 2023, 2024})
+    void testGetVehicleByYear(int vehicleYear) {
+        RestAssured.baseURI = "https://api.example.com";
+
+        Response response = given()
+            .pathParam("year", vehicleYear)
+            .when()
+            .get("/vehicles/{year}")
+            .then()
+            .statusCode(200)  // Assuming the endpoint returns 200 for valid years
+            .body("year", equalTo(vehicleYear))  // Checking that the returned year matches the input
+            .extract().response();
+
+        System.out.println("Vehicle Year: " + vehicleYear);
+        System.out.println(response.asString());
+    }
+}
+
+
+In this test:
+
+	•	The @ValueSource(ints = { ... }) annotation is used to pass 10 different vehicle years as test parameters.
+	•	Each test sends a GET request to the /vehicles/{year} endpoint.
+	•	The response is validated to ensure that the year in the response matches the input year and that the status code is 200. You can modify these assertions to match your API’s expected behavior.
+
