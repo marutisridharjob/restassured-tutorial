@@ -1,0 +1,359 @@
+An example of how you can create a fully dynamic test case structure with multiple REST services, using dynamic configuration files, test data, and report generation.
+
+Folder Structure
+
+project-root
+│
+├── src
+│   ├── main
+│   └── test
+│       └── java
+│           └── com
+│               └── example
+│                   └── api
+│                       └── VehicleApiTest.java
+│       └── resources
+│           ├── config_website1.properties
+│           ├── config_website2.properties
+│           ├── year_test_data.csv
+│           └── model_test_data.csv
+├── pom.xml
+└── README.md
+
+
+
+1. pom.xml Configuration
+
+The pom.xml defines the Maven project, plugins for running tests (Surefire) and generating reports (Allure), and dependencies for REST Assured and JUnit.
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.example</groupId>
+    <artifactId>vehicle-api-test</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <!-- REST-Assured for API testing -->
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <version>4.5.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- JUnit 5 for testing framework -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.7.0</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.7.0</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Maven Surefire Plugin for running tests -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.0.0-M5</version>
+                <configuration>
+                    <systemPropertyVariables>
+                        <configFile>${configFile}</configFile>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+
+            <!-- Plugin for generating Allure reports -->
+            <plugin>
+                <groupId>io.qameta.allure</groupId>
+                <artifactId>allure-maven</artifactId>
+                <version>2.10.0</version>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <!-- Profile for website 1 -->
+        <profile>
+            <id>website1</id>
+            <properties>
+                <configFile>src/test/resources/config_website1.properties</configFile>
+            </properties>
+        </profile>
+
+        <!-- Profile for website 2 -->
+        <profile>
+            <id>website2</id>
+            <properties>
+                <configFile>src/test/resources/config_website2.properties</configFile>
+            </properties>
+        </profile>
+    </profiles>
+</project>
+
+
+2. Configuration Files
+
+Each website has its own configuration file to manage base URLs and endpoints dynamically.
+
+config_website1.properties
+
+base.url=https://api.website1.com
+year.endpoint=/year/{year}
+model.endpoint=/model/{model}
+
+config_website2.properties
+
+base.url=https://api.website2.com
+year.endpoint=/year/{year}
+model.endpoint=/model/{model}
+
+3. Test Data Files
+
+We use CSV files to store the test input and expected results. These files should reside in the src/test/resources directory.
+
+year_test_data.csv
+
+year,expectedStatusCode,expectedYear
+1995,200,1995
+2000,200,2000
+2023,404,null
+
+model_test_data.csv
+
+model,expectedStatusCode,expectedMake,expectedModel,expectedYear
+Accord,200,Honda,Accord,2010
+Camry,200,Toyota,Camry,2015
+Unknown,404,null,null,null
+
+4. Test Code (VehicleApiTest.java)
+
+The test code is dynamic and uses RestAssured, loading configuration properties and test data files for multiple endpoints.
+
+package com.example.api;
+
+import io.restassured.RestAssured;
+import io.restassured.response.Response;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvFileSource;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.equalTo;
+
+public class VehicleApiTest {
+
+    private static String baseUrl;
+    private static String yearEndpoint;
+    private static String modelEndpoint;
+
+    @BeforeAll
+    public static void setup() throws IOException {
+        // Load the appropriate config file for the environment
+        String configFile = System.getProperty("configFile", "src/test/resources/config_website1.properties");
+
+        Properties properties = new Properties();
+        FileInputStream configStream = new FileInputStream(configFile);
+        properties.load(configStream);
+
+        baseUrl = properties.getProperty("base.url");
+        yearEndpoint = properties.getProperty("year.endpoint");
+        modelEndpoint = properties.getProperty("model.endpoint");
+    }
+
+    // Test for /year/{year} endpoint
+    @ParameterizedTest
+    @CsvFileSource(resources = "/year_test_data.csv", numLinesToSkip = 1)
+    void testGetVehicleByYear(int year, int expectedStatusCode, String expectedYear) {
+        RestAssured.baseURI = baseUrl;
+
+        Response response = given()
+            .pathParam("year", year)
+            .when()
+            .get(yearEndpoint)
+            .then()
+            .statusCode(expectedStatusCode)
+            .extract().response();
+
+        if (expectedYear != null) {
+            response.then().body("year", equalTo(Integer.parseInt(expectedYear)));
+        }
+    }
+
+    // Test for /model/{model} endpoint
+    @ParameterizedTest
+    @CsvFileSource(resources = "/model_test_data.csv", numLinesToSkip = 1)
+    void testGetVehicleByModel(String model, int expectedStatusCode, String expectedMake, String expectedModel, String expectedYear) {
+        RestAssured.baseURI = baseUrl;
+
+        Response response = given()
+            .pathParam("model", model)
+            .when()
+            .get(modelEndpoint)
+            .then()
+            .statusCode(expectedStatusCode)
+            .extract().response();
+
+        if (expectedMake != null && expectedModel != null && expectedYear != null) {
+            response.then().body("make", equalTo(expectedMake))
+                    .body("model", equalTo(expectedModel))
+                    .body("year", equalTo(Integer.parseInt(expectedYear)));
+        }
+    }
+}
+
+
+5. Running the Tests for Multiple Websites
+
+To run the tests for multiple configurations (e.g., website1 and website2), you can use Maven profiles. Run the following commands:
+
+For Website 1:
+
+mvn test -Pwebsite1
+
+For Website 2:
+
+mvn test -Pwebsite2
+
+6. Generating Reports
+
+After running the tests, you can generate Allure reports with:
+
+mvn allure:serve
+
+This command will generate a report and open it in a web browser, showing the results of the test runs across different configurations.
+
+7. One-Step Execution
+
+To run all tests for both profiles (website1 and website2) and automatically generate reports, you can create a shell or batch script that runs all the steps.
+
+Shell Script (run_tests.sh)
+
+#!/bin/bash
+
+# Run tests for website1
+mvn test -Pwebsite1
+
+# Run tests for website2
+mvn test -Pwebsite2
+
+# Generate Allure report
+mvn allure:serve
+
+Make the script executable and run it:
+
+chmod +x run_tests.sh
+./run_tests.sh
+
+Conclusion
+
+This setup allows you to:
+
+	•	Run tests dynamically for multiple endpoints and configurations using a combination of property files and test data from CSV files.
+	•	Generate detailed reports with Allure for each set of tests.
+	•	Easily extend the tests for additional configurations, endpoints, and data by modifying the configuration and data files without changing the test code.
+
+
+TO AUTOMATE EXECUTION AND REPORT GENERATION
+
+To run all tests for different profiles (e.g., website1 and website2) and generate a report using a single line command, you can configure Maven to run both profiles sequentially and then generate the report afterward.
+
+1. Use Maven Profiles and Surefire Plugin
+
+You can set up your pom.xml so that both profiles (website1 and website2) run in a single execution, followed by the Allure report generation.
+
+Modify pom.xml
+
+Add a parent profile to run both website1 and website2 tests, and configure Maven to invoke Allure report generation automatically at the end.
+
+<profiles>
+    <!-- Parent Profile to run both website1 and website2 tests -->
+    <profile>
+        <id>all-websites</id>
+        <activation>
+            <activeByDefault>true</activeByDefault> <!-- Run this profile by default -->
+        </activation>
+        <build>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.0.0-M5</version>
+                    <executions>
+                        <!-- Run tests for website1 -->
+                        <execution>
+                            <id>run-tests-website1</id>
+                            <goals>
+                                <goal>test</goal>
+                            </goals>
+                            <configuration>
+                                <systemPropertyVariables>
+                                    <configFile>src/test/resources/config_website1.properties</configFile>
+                                </systemPropertyVariables>
+                            </configuration>
+                        </execution>
+
+                        <!-- Run tests for website2 -->
+                        <execution>
+                            <id>run-tests-website2</id>
+                            <goals>
+                                <goal>test</goal>
+                            </goals>
+                            <configuration>
+                                <systemPropertyVariables>
+                                    <configFile>src/test/resources/config_website2.properties</configFile>
+                                </systemPropertyVariables>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </build>
+    </profile>
+
+    <!-- Allure Report Plugin -->
+    <plugin>
+        <groupId>io.qameta.allure</groupId>
+        <artifactId>allure-maven</artifactId>
+        <version>2.10.0</version>
+    </plugin>
+</profiles>
+
+
+2. One-Step Command to Run All Tests and Generate Reports
+
+Now, you can run all tests for website1 and website2, and generate the Allure report in one command:
+
+mvn test allure:serve
+
+Explanation of the Command:
+
+	•	mvn test: Runs all the tests defined under the all-websites profile. This executes both website1 and website2 tests in sequence.
+	•	allure:serve: Automatically generates and serves the Allure report once the tests are complete.
+
+3. Additional Options
+
+If you prefer not to activate the parent profile (all-websites) by default, you can specify it explicitly when running the tests:
+
+mvn test -Pall-websites allure:serve
+
+Conclusion
+
+This setup allows you to:
+
+	•	Run tests for multiple profiles in a single command.
+	•	Generate Allure reports immediately after test execution.
+	•	Ensure seamless automation of testing across different configurations (e.g., website1 and website2).
