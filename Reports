@@ -1,0 +1,129 @@
+To automatically run tests using different configuration properties and generate reports, you can leverage Maven, JUnit 5, and a test framework like Surefire (for running tests) and Surefire/Allure plugins (for generating reports). This can be set up in a way that iterates through multiple configurations and runs the same test suite for each configuration.
+
+Here’s a step-by-step guide on how to set this up:
+
+1. Maven Project Setup
+
+Ensure your project is a Maven project, and your pom.xml is configured with the necessary plugins for running tests and generating reports.
+
+2. Maven Surefire Plugin Configuration
+
+You can use the Maven Surefire Plugin to run your tests for each configuration (website) and pass the different configuration files as system properties.
+
+Add this to your pom.xml:
+                                                                                                                                                                                                               
+<build>
+    <plugins>
+        <!-- Plugin to run tests with different configurations -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>3.0.0-M5</version>
+            <configuration>
+                <systemPropertyVariables>
+                    <!-- This property will be overwritten by profiles to point to different config files -->
+                    <configFile>${configFile}</configFile>
+                </systemPropertyVariables>
+            </configuration>
+        </plugin>
+
+        <!-- Plugin to generate test reports -->
+        <plugin>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-maven</artifactId>
+            <version>2.10.0</version>
+        </plugin>
+    </plugins>
+</build>
+                                                                                                                                                                                                               
+
+3. Profiles for Each Configuration
+
+You can define multiple profiles in the pom.xml, one for each website or configuration, where each profile passes the appropriate configFile value.
+
+Example:
+
+<profiles>
+    <profile>
+        <id>website1</id>
+        <properties>
+            <configFile>src/test/resources/config_website1.properties</configFile>
+        </properties>
+    </profile>
+
+    <profile>
+        <id>website2</id>
+        <properties>
+            <configFile>src/test/resources/config_website2.properties</configFile>
+        </properties>
+    </profile>
+
+    <!-- Add more profiles for other websites or configurations -->
+</profiles>
+                                                                                                                                                                                                               
+4. Running Tests Automatically for All Configurations
+
+You can run the tests for each configuration using Maven. To run all profiles in sequence, you can use the mvn command like this:
+                                                                                                                                                                                                               
+mvn test -Pwebsite1
+mvn test -Pwebsite2
+                                                                                                                                                                                                               
+Or, you can automate the execution for all profiles sequentially by chaining the commands in a shell script or using Maven profiles that execute multiple child profiles.
+
+For example, to run both profiles automatically:
+                                                                                                                                                                                                               
+mvn test -Pwebsite1,website2
+                                                                                                                                                                                                               
+5. Generate Test Reports
+
+To generate test reports, you can use Allure or Surefire reports.
+
+Surefire Reporting:
+
+Maven Surefire Plugin automatically generates reports under the target/surefire-reports directory for each run. You can aggregate these reports to get an overview of your test results.
+
+Allure Reporting:
+
+If you want to generate more detailed and visual reports, you can use Allure. After running your tests, you can generate Allure reports using the following command:
+                                                                                                                                                                                                               
+mvn allure:serve
+                                                                                                                                                                                                               
+This will start an Allure server with a beautiful visual report of your test results.
+
+6. Example Maven Command to Run Tests and Generate Reports
+
+Here’s an example of running tests for two configurations and generating the reports:
+                                                                                                                                                                                                               
+# Run tests for both website1 and website2
+mvn test -Pwebsite1
+mvn test -Pwebsite2
+
+# Generate Allure reports
+mvn allure:serve
+                                                                                                                                                                                                               
+
+7. Test Code Structure
+
+Your test code remains generic, as described earlier, with dynamic properties loading from the configuration files and reading test data from CSV.
+
+@BeforeAll
+public static void setup() throws IOException {
+    String configFile = System.getProperty("configFile", "src/test/resources/config_default.properties");
+    Properties properties = new Properties();
+    FileInputStream configStream = new FileInputStream(configFile);
+    properties.load(configStream);
+    
+    baseUrl = properties.getProperty("base.url");
+    vehicleEndpoint = properties.getProperty("vehicle.endpoint");
+}
+                                                                                                                                                                                                               
+Benefits of This Approach:
+
+	1.	Multiple Configurations: You can easily run the same test for different websites or configurations.
+	2.	Automation: You can fully automate the process of running tests for different environments and generating reports.
+	3.	Test Reporting: Allure or Surefire provides detailed, aggregated test reports with a breakdown of tests and results for each configuration.
+	4.	Scalability: You can add more profiles for additional websites, environments, or test configurations without changing the core test code.
+
+This setup helps you ensure that your tests are adaptable and easy to maintain across multiple environments or websites while also providing automated reports after every test run.
+
+                                                                                                                                                                                                               
