@@ -1,0 +1,344 @@
+you can keep the test data in a separate file and use it for parameterized tests in JUnit 5. You can use @CsvFileSource to read the test data from a CSV file, which is very useful for separating test data from your test logic.
+
+Here’s how you can modify the test to read the vehicle year data from a CSV file:
+
+1. Create a CSV file (e.g., vehicle_years.csv)
+
+1995
+2000
+2005
+2010
+2015
+2020
+2021
+2022
+2023
+2024
+
+
+2. Modify the Test to Use @CsvFileSource
+
+import io.restassured.RestAssured;
+import io.restassured.response.Response;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvFileSource;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.equalTo;
+
+public class VehicleApiTest {
+
+    @ParameterizedTest
+    @CsvFileSource(resources = "/vehicle_years.csv", numLinesToSkip = 1)
+    void testGetVehicleByYear(int vehicleYear) {
+        RestAssured.baseURI = "https://api.example.com";
+
+        Response response = given()
+            .pathParam("year", vehicleYear)
+            .when()
+            .get("/vehicles/{year}")
+            .then()
+            .statusCode(200)  // Assuming the endpoint returns 200 for valid years
+            .body("year", equalTo(vehicleYear))  // Checking that the returned year matches the input
+            .extract().response();
+
+        System.out.println("Vehicle Year: " + vehicleYear);
+        System.out.println(response.asString());
+    }
+}
+
+
+
+Explanation:
+
+	•	@CsvFileSource(resources = "/vehicle_years.csv", numLinesToSkip = 1) specifies the path to the CSV file containing the test data.
+	•	The resources path is relative to the src/test/resources directory.
+	•	numLinesToSkip = 1 skips the header row if you include one in the CSV file (optional if no header exists).
+	•	The CSV file contains the vehicle year data, and the test reads from this file.
+
+Make sure to place the vehicle_years.csv file in the src/test/resources directory, so it’s accessible in the classpath during testing.
+
+
+
+To make the test more dynamic and generic by keeping the base URL, endpoint strings, and parameters in a separate configuration file, you can use properties files or JSON/YAML files. Here’s an example using a .properties file and how you can load it in your test code.
+
+1. Create a config.properties file
+
+Place this file in the src/test/resources directory:
+
+config.properties
+
+base.url=https://api.example.com
+vehicle.endpoint=/vehicles/{year}
+
+2. Modify the Test Code to Load Configuration
+
+You can use java.util.Properties to load the configuration file in your test:
+
+import io.restassured.RestAssured;
+import io.restassured.response.Response;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvFileSource;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.equalTo;
+
+public class VehicleApiTest {
+
+    private static String baseUrl;
+    private static String vehicleEndpoint;
+
+    @BeforeAll
+    public static void setup() throws IOException {
+        Properties properties = new Properties();
+        FileInputStream configStream = new FileInputStream("src/test/resources/config.properties");
+        properties.load(configStream);
+        
+        baseUrl = properties.getProperty("base.url");
+        vehicleEndpoint = properties.getProperty("vehicle.endpoint");
+    }
+
+    @ParameterizedTest
+    @CsvFileSource(resources = "/vehicle_years.csv", numLinesToSkip = 1)
+    void testGetVehicleByYear(int vehicleYear) {
+        RestAssured.baseURI = baseUrl;
+
+        Response response = given()
+            .pathParam("year", vehicleYear)
+            .when()
+            .get(vehicleEndpoint)
+            .then()
+            .statusCode(200)  // Assuming the endpoint returns 200 for valid years
+            .body("year", equalTo(vehicleYear))  // Checking that the returned year matches the input
+            .extract().response();
+
+        System.out.println("Vehicle Year: " + vehicleYear);
+        System.out.println(response.asString());
+    }
+}
+
+
+Explanation:
+
+	1.	config.properties:
+	•	Contains the base.url and vehicle.endpoint that the test code reads dynamically.
+	2.	Test Code:
+	•	The setup() method annotated with @BeforeAll is executed before any tests run. It loads the config.properties file and sets baseUrl and vehicleEndpoint variables.
+	•	These variables are then used dynamically in the test, making the test generic and configurable.
+
+3. Flexible Configuration:
+
+	•	You can add more endpoints and parameters in the config.properties file and load them similarly, making your tests adaptable without changing the test code directly.
+
+o use the same test code for multiple websites and test data dynamically, you can extend the solution by leveraging multiple configuration files (for different environments) and making the data (URLs, endpoints, parameters) configurable. Here’s how you can do it:
+
+1. Use Separate Property Files for Each Website
+
+You can create different property files for each environment (or website). For example, one file per website:
+
+	•	config_website1.properties
+	•	config_website2.properties
+
+Each properties file can have its own base URL and endpoint definitions.
+
+Example of config_website1.properties
+
+base.url=https://api.website1.com
+vehicle.endpoint=/vehicles/{year}
+
+Example of config_website2.properties
+
+base.url=https://api.website2.com
+vehicle.endpoint=/cars/{year}
+
+2. Use Separate Test Data Files
+
+Each website might have its own test data (e.g., vehicle years). You can use separate CSV files:
+
+	•	vehicle_years_website1.csv
+	•	vehicle_years_website2.csv
+
+3. Modify the Test Code to Accept Website and Data File as Parameters
+
+Here’s how you can modify your test code to load different configuration files and test data dynamically using environment variables or system properties:
+
+import io.restassured.RestAssured;
+import io.restassured.response.Response;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvFileSource;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.equalTo;
+
+public class VehicleApiTest {
+
+    private static String baseUrl;
+    private static String vehicleEndpoint;
+
+    @BeforeAll
+    public static void setup() throws IOException {
+        // Get environment variable or system property for the config file to use
+        String configFile = System.getProperty("configFile", "src/test/resources/config_website1.properties");
+
+        // Load properties based on the environment or system property
+        Properties properties = new Properties();
+        FileInputStream configStream = new FileInputStream(configFile);
+        properties.load(configStream);
+
+        baseUrl = properties.getProperty("base.url");
+        vehicleEndpoint = properties.getProperty("vehicle.endpoint");
+    }
+
+    @ParameterizedTest
+    @CsvFileSource(resources = "/vehicle_years_website1.csv", numLinesToSkip = 1)
+    void testGetVehicleByYear(int vehicleYear) {
+        RestAssured.baseURI = baseUrl;
+
+        Response response = given()
+            .pathParam("year", vehicleYear)
+            .when()
+            .get(vehicleEndpoint)
+            .then()
+            .statusCode(200)  // Assuming the endpoint returns 200 for valid years
+            .body("year", equalTo(vehicleYear))  // Checking that the returned year matches the input
+            .extract().response();
+
+        System.out.println("Vehicle Year: " + vehicleYear);
+        System.out.println(response.asString());
+    }
+}
+
+
+4. Explanation:
+
+	•	System.getProperty(): This method allows you to specify which configuration file to load based on a system property (e.g., configFile). You can pass the config file path dynamically when you run the tests, allowing you to test different websites without changing the code.
+	•	CSV Data Files: Change the @CsvFileSource(resources = "/vehicle_years_website1.csv") to the appropriate CSV file based on the website. This can be parameterized similarly, depending on how you want to organize the tests.
+
+5. Running the Tests for Different Websites
+
+When running tests, you can specify different configurations via system properties.
+
+Example: Run with config_website1.properties
+
+mvn test -DconfigFile=src/test/resources/config_website1.properties
+
+Example: Run with config_website2.properties
+
+mvn test -DconfigFile=src/test/resources/config_website2.properties
+
+This approach lets you test multiple websites and datasets with a single, generic test codebase. The URLs, endpoints, and data are dynamically loaded at runtime, depending on which configuration and data files you specify.
+
+
+
+
+When structuring test data that includes both input parameters and expected results, it’s important to clearly define the expected behavior for each test case. You can use a CSV file to store test data and expected results, where each row corresponds to a test case.
+
+Here’s an example of how the test data with expected results might look in a CSV file for vehicle year testing:
+
+1. Example CSV File (vehicle_data_with_expected_results.csv)
+
+vehicleYear,expectedStatusCode,expectedResponseField,expectedFieldValue
+1995,200,year,1995
+2000,200,year,2000
+2005,200,year,2005
+2010,200,year,2010
+2015,200,year,2015
+2020,200,year,2020
+2021,404,message,Vehicle not found
+2022,200,year,2022
+2023,400,message,Invalid year
+2024,200,year,2024
+
+
+2. Explanation of the CSV Structure:
+
+	•	vehicleYear: The year of the vehicle to be passed as a parameter to the API.
+	•	expectedStatusCode: The HTTP status code you expect from the API for this input.
+	•	expectedResponseField: The key in the JSON response body that you want to validate (e.g., “year” or “message”).
+	•	expectedFieldValue: The expected value of the corresponding expectedResponseField.
+
+This structure allows you to map each test case (input and expected output) to what you expect from the API response.
+
+3. Test Code to Use the Test Data:
+
+Now, you can modify the test code to use this data:
+
+
+import io.restassured.RestAssured;
+import io.restassured.response.Response;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvFileSource;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.equalTo;
+
+public class VehicleApiTest {
+
+    private static String baseUrl;
+    private static String vehicleEndpoint;
+
+    @BeforeAll
+    public static void setup() throws IOException {
+        // Load configuration dynamically as before
+        String configFile = System.getProperty("configFile", "src/test/resources/config_website1.properties");
+
+        Properties properties = new Properties();
+        FileInputStream configStream = new FileInputStream(configFile);
+        properties.load(configStream);
+
+        baseUrl = properties.getProperty("base.url");
+        vehicleEndpoint = properties.getProperty("vehicle.endpoint");
+    }
+
+    @ParameterizedTest
+    @CsvFileSource(resources = "/vehicle_data_with_expected_results.csv", numLinesToSkip = 1)
+    void testGetVehicleByYear(int vehicleYear, int expectedStatusCode, String expectedResponseField, String expectedFieldValue) {
+        RestAssured.baseURI = baseUrl;
+
+        Response response = given()
+            .pathParam("year", vehicleYear)
+            .when()
+            .get(vehicleEndpoint)
+            .then()
+            .statusCode(expectedStatusCode)  // Validate the status code
+            .body(expectedResponseField, equalTo(expectedFieldValue))  // Validate the expected field in the response
+            .extract().response();
+
+        System.out.println("Tested Vehicle Year: " + vehicleYear);
+        System.out.println(response.asString());
+    }
+}
+
+
+4. How It Works:
+
+	•	CSV Data File: The test reads test cases from the CSV file, where each row provides:
+	•	The vehicle year to be tested (vehicleYear).
+	•	The expected HTTP status code (expectedStatusCode).
+	•	The field in the JSON response to validate (expectedResponseField).
+	•	The expected value of that field (expectedFieldValue).
+	•	Dynamic Testing: Each test case is dynamically validated based on the input and expected output data from the CSV file.
+
+5. Example Expected Behaviors:
+
+	•	Vehicle year 1995: Expected status code 200, and the year field in the response should be 1995.
+	•	Vehicle year 2021: Expected status code 404, with a response field message indicating "Vehicle not found".
+	•	Vehicle year 2023: Expected status code 400, with a response field message indicating "Invalid year".
+
+By structuring the test data in this way, you can easily test multiple scenarios, including both valid and invalid inputs, expected error messages, and different status codes, all while keeping the test logic generic and reusable.
+
