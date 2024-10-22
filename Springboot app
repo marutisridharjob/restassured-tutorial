@@ -292,3 +292,301 @@ This command will:
 
 
 
+----------------------------------------------------------------------WITH TEST------------------------------------------------------------------------------
+
+
+Let’s create a Spring Boot REST API project that handles vehicle data (make, model, year) via JSON requests and responses. We’ll implement the API and include RestAssured tests that cover different scenarios.
+
+Detailed Spring Boot REST Project with RestAssured Tests
+
+1. Create the Spring Boot Project
+
+You can create the project using Spring Initializr (https://start.spring.io/) with the following dependencies:
+
+	•	Spring Web (to create RESTful web services)
+	•	Spring Boot DevTools (for hot-reloading)
+	•	Lombok (optional for reducing boilerplate code)
+	•	JUnit 5 (for testing)
+	•	RestAssured (for API testing)
+	•	Spring Boot Test (for integration testing)
+
+Spring Boot Dependencies (pom.xml)
+
+Here is the pom.xml file that includes the necessary dependencies for the project:
+
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>vehicle-api</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.7.1</version>
+        <relativePath/> <!-- lookup parent from repository -->
+    </parent>
+
+    <properties>
+        <java.version>11</java.version>
+    </properties>
+
+    <dependencies>
+        <!-- Spring Boot Web for RESTful services -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Test for integration testing -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- RestAssured for API testing -->
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <version>4.4.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Lombok for reducing boilerplate code -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.12</version>
+            <scope>provided</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+
+
+
+2. Define Vehicle Model Class
+
+We’ll create a Vehicle class that represents the model (the vehicle’s details like make, model, and year).
+
+Vehicle.java
+
+package com.example.vehicleapi.model;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class Vehicle {
+    private String make;
+    private String model;
+    private int year;
+}
+
+
+
+Here we use Lombok annotations:
+
+	•	@Data: Generates getters, setters, toString, equals, and hashCode methods.
+	•	@AllArgsConstructor: Generates a constructor with all arguments.
+	•	@NoArgsConstructor: Generates a no-argument constructor.
+
+3. Create the Vehicle Controller
+
+Now, we’ll define a REST controller that exposes an endpoint to accept a vehicle in the request body and respond with the same vehicle object.
+
+VehicleController.java
+
+package com.example.vehicleapi.controller;
+
+import com.example.vehicleapi.model.Vehicle;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/vehicles")
+public class VehicleController {
+
+    @PostMapping
+    public ResponseEntity<Vehicle> createVehicle(@RequestBody Vehicle vehicle) {
+        // For now, we just return the same vehicle as the response
+        return new ResponseEntity<>(vehicle, HttpStatus.CREATED);
+    }
+
+    @GetMapping("/{make}/{model}")
+    public ResponseEntity<Vehicle> getVehicle(
+            @PathVariable String make, 
+            @PathVariable String model) {
+        
+        // Mock a vehicle for the example
+        Vehicle vehicle = new Vehicle(make, model, 2021);
+        return new ResponseEntity<>(vehicle, HttpStatus.OK);
+    }
+}
+
+
+
+package com.example.vehicleapi.controller;
+
+import com.example.vehicleapi.model.Vehicle;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+@RestController
+@RequestMapping("/api/vehicles")
+public class VehicleController {
+
+    @PostMapping
+    public ResponseEntity<Vehicle> createVehicle(@RequestBody Vehicle vehicle) {
+        // For now, we just return the same vehicle as the response
+        return new ResponseEntity<>(vehicle, HttpStatus.CREATED);
+    }
+
+    @GetMapping("/{make}/{model}")
+    public ResponseEntity<Vehicle> getVehicle(
+            @PathVariable String make, 
+            @PathVariable String model) {
+        
+        // Mock a vehicle for the example
+        Vehicle vehicle = new Vehicle(make, model, 2021);
+        return new ResponseEntity<>(vehicle, HttpStatus.OK);
+    }
+}
+
+
+
+Explanation:
+
+	•	@PostMapping: Accepts a vehicle JSON object via POST and returns the same object.
+	•	@GetMapping("/{make}/{model}"): Returns a mocked vehicle object based on the make and model passed in the URL.
+
+4. Testing with RestAssured
+
+Now we’ll write tests for this controller using RestAssured. The tests will:
+
+	1.	Send a POST request to create a vehicle.
+	2.	Send a GET request to retrieve a vehicle by make and model.
+	3.	Compare the responses with expected JSON values.
+
+VehicleControllerTest.java
+
+
+package com.example.vehicleapi;
+
+import com.example.vehicleapi.model.Vehicle;
+import io.restassured.RestAssured;
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.web.server.LocalServerPort;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.*;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+public class VehicleControllerTest {
+
+    @LocalServerPort
+    private int port;
+
+    @BeforeEach
+    public void setup() {
+        RestAssured.port = port; // Set the port for RestAssured
+    }
+
+    @Test
+    public void testCreateVehicle() {
+        // Create a new vehicle
+        Vehicle newVehicle = new Vehicle("Tesla", "Model X", 2022);
+
+        // Send POST request and verify response
+        given()
+            .contentType(ContentType.JSON)
+            .body(newVehicle)
+        .when()
+            .post("/api/vehicles")
+        .then()
+            .statusCode(201)  // Verify that the response is "Created"
+            .body("make", equalTo("Tesla"))
+            .body("model", equalTo("Model X"))
+            .body("year", equalTo(2022)); // Check JSON response values
+    }
+
+    @Test
+    public void testGetVehicle() {
+        // Send GET request and verify response
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .get("/api/vehicles/Tesla/ModelX")
+        .then()
+            .statusCode(200)  // Verify that the response is "OK"
+            .body("make", equalTo("Tesla"))
+            .body("model", equalTo("ModelX"))
+            .body("year", equalTo(2021));  // Mocked year in the controller
+    }
+
+    @Test
+    public void testCreateVehicleWithInvalidData() {
+        // Try to create a vehicle with invalid year
+        Vehicle invalidVehicle = new Vehicle("Tesla", "Model 3", -2022);
+
+        // Send POST request and expect a bad request
+        given()
+            .contentType(ContentType.JSON)
+            .body(invalidVehicle)
+        .when()
+            .post("/api/vehicles")
+        .then()
+            .statusCode(400);  // Bad Request expected
+    }
+}
+
+
+
+Explanation of Tests:
+
+	1.	testCreateVehicle():
+	•	Sends a POST request with a new vehicle (make, model, year) and validates the response to ensure the vehicle data matches the input.
+	2.	testGetVehicle():
+	•	Sends a GET request to retrieve a vehicle based on the make and model passed in the URL. It verifies that the response returns the expected values.
+	3.	testCreateVehicleWithInvalidData():
+	•	Sends a POST request with an invalid year (negative value) and expects a 400 Bad Request status code.
+
+5. Run the Tests
+
+You can run the tests using Maven:
+
+
+mvn test
+
+Or, if you’re using an IDE like Eclipse or IntelliJ, right-click the VehicleControllerTest class and select Run as JUnit Test.
+
+Conclusion:
+
+This project covers:
+
+	•	A Spring Boot REST API that handles vehicles (make, model, year).
+	•	Tests using RestAssured to verify the correctness of the API.
+	•	Three scenarios: normal creation, fetching by make/model, and handling invalid data.
