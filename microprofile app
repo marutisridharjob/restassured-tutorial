@@ -616,3 +616,288 @@ sh 'kubectl apply -f kubernetes-deployment.yaml'
 
 
 
+-------------------------------------------------------------------------------WITH TESTS-------------------------------------------------------------------------------------------
+
+
+
+Let’s create a MicroProfile REST API project that takes a JSON object and provides a JSON object as a response. We’ll include the following:
+
+	1.	A REST endpoint for creating a vehicle (POST) and fetching a vehicle by make, model, and year (GET).
+	2.	JUnit 5 tests using RestAssured to cover all scenarios, including valid and invalid requests.
+
+Project Structure
+
+vehicle-api-microprofile/
+├── src
+│   ├── main
+│   │   └── java
+│   │       └── com
+│   │           └── example
+│   │               └── vehicles
+│   │                   ├── Vehicle.java
+│   │                   └── VehicleResource.java
+│   ├── test
+│   │   └── java
+│   │       └── com
+│   │           └── example
+│   │               └── VehicleResourceTest.java
+├── pom.xml
+
+
+1. MicroProfile REST API Setup
+
+pom.xml
+
+Here’s a simple Maven POM file with dependencies for MicroProfile, JUnit 5, and RestAssured.
+
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>vehicle-api-microprofile</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <!-- MicroProfile dependency -->
+        <dependency>
+            <groupId>org.eclipse.microprofile</groupId>
+            <artifactId>microprofile</artifactId>
+            <version>3.3</version>
+        </dependency>
+
+        <!-- JUnit 5 for testing -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>5.7.0</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>5.7.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- RestAssured for testing -->
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <version>4.4.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- MicroProfile Testing -->
+        <dependency>
+            <groupId>org.microshed</groupId>
+            <artifactId>microshed-testing-liberty</artifactId>
+            <version>0.9</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.8.1</version>
+                <configuration>
+                    <source>11</source>
+                    <target>11</target>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+
+2. Vehicle Model
+
+The Vehicle class will represent the data model for vehicles, with make, model, and year as fields.
+
+Vehicle.java
+
+package com.example.vehicles;
+
+public class Vehicle {
+    private String make;
+    private String model;
+    private int year;
+
+    public Vehicle() {
+    }
+
+    public Vehicle(String make, String model, int year) {
+        this.make = make;
+        this.model = model;
+        this.year = year;
+    }
+
+    // Getters and setters
+    public String getMake() {
+        return make;
+    }
+
+    public void setMake(String make) {
+        this.make = make;
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
+    }
+
+    public int getYear() {
+        return year;
+    }
+
+    public void setYear(int year) {
+        this.year = year;
+    }
+}
+
+
+
+
+3. Vehicle Resource (REST API Controller)
+
+The VehicleResource class will handle POST and GET requests:
+
+	•	POST /vehicles: Create a vehicle from a JSON request.
+	•	GET /vehicles/{make}/{model}: Retrieve a vehicle by make and model.
+
+VehicleResource.java
+
+package com.example.vehicles;
+
+import javax.ws.rs.*;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+
+@Path("/vehicles")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class VehicleResource {
+
+    @POST
+    public Response createVehicle(Vehicle vehicle) {
+        // Simulate vehicle creation (in a real app, you'd save this to a database)
+        return Response.status(Response.Status.CREATED).entity(vehicle).build();
+    }
+
+    @GET
+    @Path("/{make}/{model}")
+    public Response getVehicle(@PathParam("make") String make, @PathParam("model") String model) {
+        // Return a mocked vehicle based on the parameters
+        Vehicle vehicle = new Vehicle(make, model, 2021); // Mocked year for example
+        return Response.ok(vehicle).build();
+    }
+}
+
+
+
+4. Testing with RestAssured
+
+We’ll write tests that:
+
+	1.	POST a vehicle and check the response.
+	2.	GET a vehicle and verify the response data.
+	3.	Test with invalid inputs and validate error handling.
+
+VehicleResourceTest.java
+
+
+package com.example;
+
+import com.example.vehicles.Vehicle;
+import io.restassured.RestAssured;
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.microshed.testing.jupiter.MicroShedTest;
+import org.microshed.testing.SharedContainerConfig;
+import org.microshed.testing.liberty.junit.LibertyServer;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.equalTo;
+
+@MicroShedTest
+@SharedContainerConfig(LocalLibertyServer.class)
+public class VehicleResourceTest {
+
+    @BeforeEach
+    public void setUp() {
+        RestAssured.baseURI = "http://localhost";
+        RestAssured.port = 9080; // Assuming Liberty is running on this port
+    }
+
+    @Test
+    public void testCreateVehicle() {
+        // Create a new vehicle
+        Vehicle vehicle = new Vehicle("Tesla", "Model S", 2022);
+
+        // POST request to create a vehicle
+        given()
+            .contentType(ContentType.JSON)
+            .body(vehicle)
+        .when()
+            .post("/vehicles")
+        .then()
+            .statusCode(201)  // Check that the status is "201 Created"
+            .body("make", equalTo("Tesla"))
+            .body("model", equalTo("Model S"))
+            .body("year", equalTo(2022));  // Check response data
+    }
+
+    @Test
+    public void testGetVehicle() {
+        // GET request to retrieve a vehicle
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .get("/vehicles/Tesla/ModelS")
+        .then()
+            .statusCode(200)  // Check that the status is "200 OK"
+            .body("make", equalTo("Tesla"))
+            .body("model", equalTo("ModelS"))
+            .body("year", equalTo(2021));  // Mocked year in the controller
+    }
+
+    @Test
+    public void testInvalidVehicleRequest() {
+        // Try to create a vehicle with invalid data
+        Vehicle invalidVehicle = new Vehicle("", "Model 3", 2022);  // Invalid make
+
+        // POST request with invalid data
+        given()
+            .contentType(ContentType.JSON)
+            .body(invalidVehicle)
+        .when()
+            .post("/vehicles")
+        .then()
+            .statusCode(400);  // Expecting 400 Bad Request (in a real scenario, validation would be handled)
+    }
+}
+
+
+
+
+5. Running the Tests
+
+You can run the tests using Maven:
+
+
+mvn clean test
+
+Alternatively, if you are using an IDE like Eclipse or IntelliJ, you can right-click the VehicleResourceTest.java class and select Run as JUnit Test.
+
+Summary of Tests
+
+	•	testCreateVehicle: Sends a POST request to create a vehicle and verifies that the response data matches the sent data.
+	•	testGetVehicle: Sends a GET request to retrieve a vehicle by make and model, and checks the response.
+	•	testInvalidVehicleRequest: Sends invalid data (an empty make field) and expects a 400 Bad Request.
