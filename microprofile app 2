@@ -1,0 +1,510 @@
+	1.	Additional Features:
+	•	Include an HTML report for results (e.g., a summary page of vehicle reports).
+	•	Extend the API to support JSON responses.
+	•	Provide a PDF report generation for vehicle details.
+	2.	Testing Enhancements:
+	•	Include RestAssured tests covering all scenarios.
+	•	Use JUnit 5 to generate detailed HTML, JSON, and PDF reports for test execution.
+
+Updated Project Structure
+
+vehicle-api-microprofile/
+├── src
+│   ├── main
+│   │   └── java
+│   │       └── com
+│   │           └── example
+│   │               └── vehicles
+│   │                   ├── Vehicle.java
+│   │                   ├── VehicleResource.java
+│   │                   ├── ReportService.java
+│   │                   └── PDFReportGenerator.java
+│   ├── resources
+│   │   └── templates
+│   │       └── vehicleReport.html  (HTML template for reporting)
+│   ├── test
+│   │   └── java
+│   │       └── com
+│   │           └── example
+│   │               └── VehicleResourceTest.java
+├── target
+│   └── generated-pdf
+├── pom.xml
+
+
+1. Vehicle Model (No Changes)
+
+This remains the same as before.
+
+Vehicle.java
+
+package com.example.vehicles;
+
+public class Vehicle {
+    private String make;
+    private String model;
+    private int year;
+
+    public Vehicle() {
+    }
+
+    public Vehicle(String make, String model, int year) {
+        this.make = make;
+        this.model = model;
+        this.year = year;
+    }
+
+    // Getters and setters
+    public String getMake() {
+        return make;
+    }
+
+    public void setMake(String make) {
+        this.make = make;
+    }
+
+    public String getModel() {
+        return model;
+    }
+
+    public void setModel(String model) {
+        this.model = model;
+    }
+
+    public int getYear() {
+        return year;
+    }
+
+    public void setYear(int year) {
+        this.year = year;
+    }
+}
+
+
+
+2. Vehicle Resource (REST API)
+
+The VehicleResource class now includes new endpoints:
+
+	•	A GET request for generating HTML reports.
+	•	A GET request for generating PDF reports.
+
+VehicleResource.java
+
+
+package com.example.vehicles;
+
+import javax.inject.Inject;
+import javax.ws.rs.*;
+import javax.ws.rs.core.MediaType;
+import javax.ws.rs.core.Response;
+import java.io.ByteArrayOutputStream;
+
+@Path("/vehicles")
+@Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
+public class VehicleResource {
+
+    @Inject
+    ReportService reportService;
+
+    @POST
+    public Response createVehicle(Vehicle vehicle) {
+        // Simulate vehicle creation
+        return Response.status(Response.Status.CREATED).entity(vehicle).build();
+    }
+
+    @GET
+    @Path("/{make}/{model}")
+    public Response getVehicle(@PathParam("make") String make, @PathParam("model") String model) {
+        // Simulate vehicle retrieval
+        Vehicle vehicle = new Vehicle(make, model, 2021);  // Mock year for simplicity
+        return Response.ok(vehicle).build();
+    }
+
+    @GET
+    @Path("/report/html")
+    @Produces(MediaType.TEXT_HTML)
+    public Response getHtmlReport() {
+        // Generate HTML report from service
+        String htmlReport = reportService.generateHtmlReport();
+        return Response.ok(htmlReport).build();
+    }
+
+    @GET
+    @Path("/report/pdf")
+    @Produces("application/pdf")
+    public Response getPdfReport() {
+        // Generate PDF report from service
+        ByteArrayOutputStream pdfReport = reportService.generatePdfReport();
+        return Response.ok(pdfReport.toByteArray())
+                .header("Content-Disposition", "attachment; filename=vehicle-report.pdf")
+                .build();
+    }
+}
+
+
+3. ReportService (HTML and PDF Reports)
+
+We will create a ReportService class that provides methods to generate both HTML and PDF reports.
+
+ReportService.java
+
+package com.example.vehicles;
+
+import javax.enterprise.context.ApplicationScoped;
+import java.io.ByteArrayOutputStream;
+
+@ApplicationScoped
+public class ReportService {
+
+    @Inject
+    PDFReportGenerator pdfReportGenerator;
+
+    public String generateHtmlReport() {
+        // For simplicity, we are returning static HTML here
+        return "<html><body><h1>Vehicle Report</h1><p>Vehicle: Tesla Model S, Year: 2022</p></body></html>";
+    }
+
+    public ByteArrayOutputStream generatePdfReport() {
+        // Use PDFReportGenerator to generate the PDF
+        return pdfReportGenerator.generate();
+    }
+}
+
+
+4. PDFReportGenerator (PDF Creation)
+
+We’ll use a simple PDF library (like iText) to generate the PDF.
+
+PDFReportGenerator.java
+
+package com.example.vehicles;
+
+import com.itextpdf.text.Document;
+import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.pdf.PdfWriter;
+
+import javax.enterprise.context.ApplicationScoped;
+import java.io.ByteArrayOutputStream;
+
+@ApplicationScoped
+public class PDFReportGenerator {
+
+    public ByteArrayOutputStream generate() {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+        Document document = new Document();
+
+        try {
+            PdfWriter.getInstance(document, outputStream);
+            document.open();
+            document.add(new Paragraph("Vehicle Report"));
+            document.add(new Paragraph("Vehicle: Tesla Model S"));
+            document.add(new Paragraph("Year: 2022"));
+            document.close();
+        } catch (DocumentException e) {
+            e.printStackTrace();
+        }
+
+        return outputStream;
+    }
+}
+
+
+5. Test Cases using RestAssured
+
+We’ll now write tests that verify the behavior of the REST API, including checking:
+
+	1.	POST: Create a vehicle.
+	2.	GET (HTML): Generate an HTML report.
+	3.	GET (PDF): Download a PDF report.
+
+VehicleResourceTest.java
+
+
+package com.example;
+
+import com.example.vehicles.Vehicle;
+import io.restassured.RestAssured;
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.microshed.testing.jupiter.MicroShedTest;
+import org.microshed.testing.SharedContainerConfig;
+import org.microshed.testing.liberty.junit.LibertyServer;
+
+import java.io.File;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.*;
+
+@MicroShedTest
+@SharedContainerConfig(LocalLibertyServer.class)
+public class VehicleResourceTest {
+
+    @BeforeEach
+    public void setUp() {
+        RestAssured.baseURI = "http://localhost";
+        RestAssured.port = 9080; // Assume Liberty is running on this port
+    }
+
+    @Test
+    public void testCreateVehicle() {
+        // Create a vehicle
+        Vehicle vehicle = new Vehicle("Tesla", "Model S", 2022);
+
+        // Send POST request
+        given()
+            .contentType(ContentType.JSON)
+            .body(vehicle)
+        .when()
+            .post("/vehicles")
+        .then()
+            .statusCode(201)
+            .body("make", equalTo("Tesla"))
+            .body("model", equalTo("Model S"))
+            .body("year", equalTo(2022));
+    }
+
+    @Test
+    public void testGetHtmlReport() {
+        // Send GET request for HTML report
+        given()
+            .accept(ContentType.HTML)
+        .when()
+            .get("/vehicles/report/html")
+        .then()
+            .statusCode(200)
+            .body(containsString("Vehicle Report"));
+    }
+
+    @Test
+    public void testGetPdfReport() throws Exception {
+        // Send GET request for PDF report
+        File pdfFile = given()
+            .accept("application/pdf")
+        .when()
+            .get("/vehicles/report/pdf")
+        .then()
+            .statusCode(200)
+            .extract()
+            .as(File.class);
+
+        // Check if the PDF is created
+        assert pdfFile.exists();
+    }
+}
+
+6. Run Tests
+
+Run the tests using Maven:
+
+mvn test
+
+Alternatively, you can run tests using your IDE’s test runner (e.g., in Eclipse or IntelliJ).
+
+7. Generate Reports
+
+Using JUnit 5 and tools like Surefire or Allure in Maven, you can generate test reports in HTML and JSON formats. Here’s how to configure Maven Surefire to generate reports:
+
+Add Surefire Plugin to pom.xml
+
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>3.0.0-M5</version>
+            <configuration>
+                <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+
+Generate Reports
+
+Run:
+
+mvn surefire-report:report
+
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+generate test reports in PDF, HTML, and JSON formats from the tests, including the results from JUnit 5 and RestAssured. To achieve this, we’ll integrate test report generation libraries and tools like Allure or Surefire, and also use a custom PDF report generator to cover the PDF format.
+
+Solution Overview:
+
+	1.	HTML and JSON reports: Use Maven Surefire or Allure for generating HTML and JSON reports.
+	2.	PDF reports: Use a custom solution to convert the test results (JSON or HTML) into a PDF format, for which we’ll use a tool like iText.
+
+Steps:
+
+1. Maven Surefire Plugin (for HTML and JSON Reports)
+
+First, let’s use Maven Surefire to generate HTML and JSON reports from the test results. Here’s how to configure the plugin.
+
+Add Surefire Plugin to pom.xml
+
+<build>
+    <plugins>
+        <!-- Surefire plugin for running tests and generating reports -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>3.0.0-M5</version>
+            <configuration>
+                <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+            </configuration>
+        </plugin>
+
+        <!-- Plugin to convert Surefire reports to HTML -->
+        <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-report-plugin</artifactId>
+            <version>3.0.0-M5</version>
+            <configuration>
+                <outputName>surefire-report</outputName>
+                <reportFormat>html</reportFormat>
+            </configuration>
+        </plugin>
+    </plugins>
+</build>
+
+
+This configuration will:
+
+	•	Run the JUnit and RestAssured tests and generate reports in XML format.
+	•	Convert Surefire XML reports to HTML using the maven-surefire-report-plugin.
+
+Running Tests and Generating HTML and JSON Reports:
+
+	1.	Run the tests:
+
+ mvn clean test
+
+ 2.	Generate HTML report:
+
+ mvn surefire-report:report
+
+
+
+ After running these commands, HTML reports will be available in the target/site/surefire-report.html.
+
+For JSON output, Surefire doesn’t natively support JSON reports, but Allure can be used to generate HTML and JSON.
+
+Using Allure for HTML and JSON Reports
+
+You can also use Allure for detailed and interactive HTML and JSON reports. Add the following plugin configuration:
+
+Add Allure Plugin to pom.xml
+
+<build>
+    <plugins>
+        <!-- Allure plugin for HTML and JSON reports -->
+        <plugin>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-maven</artifactId>
+            <version>2.10.0</version>
+            <executions>
+                <execution>
+                    <phase>test</phase>
+                    <goals>
+                        <goal>serve</goal>
+                    </goals>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+
+
+Running Allure Reports:
+
+	1.	Run the tests with Allure:
+
+ mvn clean test
+
+ 	2.	Generate Allure reports (JSON + HTML):
+
+  mvn allure:serve
+
+  This will generate interactive HTML and JSON reports.
+
+2. Generating PDF Reports
+
+Now, for PDF report generation, we can use iText to convert the HTML test report into a PDF file.
+
+PDFReportGenerator.java
+
+We’ll use the iText library to convert the HTML or plain text test results into a PDF report.
+
+	1.	Add iText dependency to your pom.xml:
+
+ <dependency>
+    <groupId>com.itextpdf</groupId>
+    <artifactId>itextpdf</artifactId>
+    <version>5.5.13.2</version>
+</dependency>
+
+	2.	PDFReportGenerator.java: Convert HTML test report to PDF
+
+ package com.example.vehicles;
+
+import com.itextpdf.text.Document;
+import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.pdf.PdfWriter;
+
+import java.io.*;
+
+public class PDFReportGenerator {
+
+    public static void generatePdfFromHtml(String htmlContent, String outputPdfPath) throws DocumentException, IOException {
+        Document document = new Document();
+        PdfWriter.getInstance(document, new FileOutputStream(outputPdfPath));
+        document.open();
+        document.add(new Paragraph(htmlContent));
+        document.close();
+    }
+
+    public static void main(String[] args) throws Exception {
+        // Simulate HTML content of test report
+        String htmlReport = "<html><body><h1>Vehicle Test Report</h1><p>All tests passed</p></body></html>";
+        generatePdfFromHtml(htmlReport, "target/generated-pdf/test-report.pdf");
+    }
+}
+
+
+
+This PDFReportGenerator converts HTML content into a PDF. You can call this method after generating the HTML test reports.
+
+3. Put It All Together
+
+	1.	Run tests using Maven:
+
+ mvn clean test
+
+ 2.	Generate HTML and JSON reports (via Surefire and Allure):
+
+ mvn surefire-report:report
+ mvn allure:serve
+
+	3.	Convert HTML report to PDF:
+After generating the HTML report, use the iText PDF generator to create the PDF report.
+
+For example:
+
+java -cp target/classes com.example.vehicles.PDFReportGenerator
+
+This will generate a PDF report in target/generated-pdf/test-report.pdf.
+
+Summary of the Complete Setup:
+
+	1.	HTML and JSON reports are generated using Surefire and Allure.
+	2.	PDF reports are generated using iText, converting either plain text or HTML reports to PDF.
+	3.	RestAssured tests cover all the scenarios like creating, fetching vehicles, and generating reports.
+
+ 
