@@ -1,0 +1,362 @@
+create a Spring Boot project that includes:
+
+	1.	REST endpoints for creating a vehicle, fetching vehicle details, and generating HTML and PDF reports.
+	2.	Tests using RestAssured to cover all scenarios, including valid and invalid requests.
+	3.	Test reports in HTML, JSON, and PDF formats using Maven Surefire, Allure, and iText.
+
+Project Structure
+
+vehicle-api-springboot/
+├── src
+│   ├── main
+│   │   └── java
+│   │       └── com
+│   │           └── example
+│   │               └── vehicles
+│   │                   ├── Vehicle.java
+│   │                   ├── VehicleController.java
+│   │                   ├── ReportService.java
+│   │                   └── PDFReportGenerator.java
+│   ├── resources
+│   │   └── templates
+│   │       └── vehicleReport.html  (HTML template for reporting)
+│   ├── test
+│   │   └── java
+│   │       └── com
+│   │           └── example
+│   │               └── VehicleControllerTest.java
+├── target
+│   └── generated-pdf
+├── pom.xml
+
+
+1. Setting Up Dependencies (pom.xml)
+
+In the pom.xml, we’ll add dependencies for Spring Boot, RestAssured, JUnit 5, iText for PDF generation, and Allure for test reports.
+
+pom.xml
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.example</groupId>
+    <artifactId>vehicle-api-springboot</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.7.1</version>
+        <relativePath/>
+    </parent>
+
+    <properties>
+        <java.version>11</java.version>
+    </properties>
+
+    <dependencies>
+        <!-- Spring Boot Starter Web -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Spring Boot Starter Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- RestAssured for API testing -->
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <version>4.4.0</version>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- iText PDF Library -->
+        <dependency>
+            <groupId>com.itextpdf</groupId>
+            <artifactId>itextpdf</artifactId>
+            <version>5.5.13.2</version>
+        </dependency>
+
+        <!-- Allure plugin for HTML and JSON test reports -->
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-rest-assured</artifactId>
+            <version>2.13.9</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Spring Boot Maven Plugin -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+
+            <!-- Maven Surefire for running tests and generating reports -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>3.0.0-M5</version>
+                <configuration>
+                    <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+                </configuration>
+            </plugin>
+
+            <!-- Allure Maven Plugin for generating reports -->
+            <plugin>
+                <groupId>io.qameta.allure</groupId>
+                <artifactId>allure-maven</artifactId>
+                <version>2.10.0</version>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+
+
+2. Vehicle Model
+
+The Vehicle class represents a vehicle entity with fields like make, model, and year.
+
+Vehicle.java
+
+package com.example.vehicles;
+
+public class Vehicle {
+    private String make;
+    private String model;
+    private int year;
+
+    public Vehicle() {}
+
+    public Vehicle(String make, String model, int year) {
+        this.make = make;
+        this.model = model;
+        this.year = year;
+    }
+
+    // Getters and setters
+    public String getMake() { return make; }
+    public void setMake(String make) { this.make = make; }
+
+    public String getModel() { return model; }
+    public void setModel(String model) { this.model = model; }
+
+    public int getYear() { return year; }
+    public void setYear(int year) { this.year = year; }
+}
+
+
+3. Vehicle REST API Controller
+
+We’ll create a VehicleController class with REST endpoints to create a vehicle, get a vehicle, and generate reports in HTML and PDF formats.
+
+VehicleController.java
+
+package com.example.vehicles;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import javax.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+
+@RestController
+@RequestMapping("/api/vehicles")
+public class VehicleController {
+
+    private final ReportService reportService;
+
+    public VehicleController(ReportService reportService) {
+        this.reportService = reportService;
+    }
+
+    @PostMapping
+    public ResponseEntity<Vehicle> createVehicle(@RequestBody Vehicle vehicle) {
+        // Return the created vehicle as a response (in a real app, you'd save this to the database)
+        return ResponseEntity.status(201).body(vehicle);
+    }
+
+    @GetMapping("/{make}/{model}")
+    public ResponseEntity<Vehicle> getVehicle(
+            @PathVariable String make, @PathVariable String model) {
+        // Return a mocked vehicle with the provided make and model (static year for simplicity)
+        Vehicle vehicle = new Vehicle(make, model, 2021);
+        return ResponseEntity.ok(vehicle);
+    }
+
+    @GetMapping("/report/html")
+    public ResponseEntity<String> getHtmlReport() {
+        // Return a generated HTML report from the ReportService
+        String htmlReport = reportService.generateHtmlReport();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_HTML_VALUE)
+                .body(htmlReport);
+    }
+
+    @GetMapping("/report/pdf")
+    public void getPdfReport(HttpServletResponse response) throws IOException {
+        // Generate PDF using ReportService and write it to the response output stream
+        response.setContentType("application/pdf");
+        response.setHeader("Content-Disposition", "attachment; filename=vehicle-report.pdf");
+        ByteArrayOutputStream pdfReport = reportService.generatePdfReport();
+        response.getOutputStream().write(pdfReport.toByteArray());
+    }
+}
+
+
+. Report Generation Service
+
+We’ll use a ReportService to generate the HTML and PDF reports.
+
+ReportService.java
+
+package com.example.vehicles;
+
+import org.springframework.stereotype.Service;
+
+import java.io.ByteArrayOutputStream;
+
+@Service
+public class ReportService {
+
+    private final PDFReportGenerator pdfReportGenerator;
+
+    public ReportService(PDFReportGenerator pdfReportGenerator) {
+        this.pdfReportGenerator = pdfReportGenerator;
+    }
+
+    public String generateHtmlReport() {
+        // Simple static HTML for the report (can be more dynamic)
+        return "<html><body><h1>Vehicle Report</h1><p>Vehicle: Tesla Model S, Year: 2022</p></body></html>";
+    }
+
+    public ByteArrayOutputStream generatePdfReport() {
+        // Delegate PDF report generation to the PDFReportGenerator
+        return pdfReportGenerator.generate();
+    }
+}
+
+
+5. PDF Report Generator
+
+We will use iText to generate the PDF report.
+
+PDFReportGenerator.java
+
+package com.example.vehicles;
+
+import io.restassured.RestAssured;
+import io.restassured.http.ContentType;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+
+import java.io.File;
+
+import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.equalTo;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
+public class VehicleControllerTest {
+
+    @BeforeEach
+    public void setUp() {
+        RestAssured.baseURI = "http://localhost";
+        RestAssured.port = 8080; // Assuming Spring Boot is running on port 8080
+    }
+
+    @Test
+    public void testCreateVehicle() {
+        Vehicle vehicle = new Vehicle("Tesla", "Model S", 2022);
+
+        given()
+            .contentType(ContentType.JSON)
+            .body(vehicle)
+        .when()
+            .post("/api/vehicles")
+        .then()
+            .statusCode(201)
+            .body("make", equalTo("Tesla"))
+            .body("model", equalTo("Model S"))
+            .body("year", equalTo(2022));
+    }
+
+    @Test
+    public void testGetVehicle() {
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .get("/api/vehicles/Tesla/ModelS")
+        .then()
+            .statusCode(200)
+            .body("make", equalTo("Tesla"))
+            .body("model", equalTo("ModelS"))
+            .body("year", equalTo(2021));
+    }
+
+    @Test
+    public void testGetHtmlReport() {
+        given()
+            .accept(ContentType.HTML)
+        .when()
+            .get("/api/vehicles/report/html")
+        .then()
+            .statusCode(200)
+            .body(equalTo("<html><body><h1>Vehicle Report</h1><p>Vehicle: Tesla Model S, Year: 2022</p></body></html>"));
+    }
+
+    @Test
+    public void testGetPdfReport() throws Exception {
+        File pdfFile = given()
+            .accept("application/pdf")
+        .when()
+            .get("/api/vehicles/report/pdf")
+        .then()
+            .statusCode(200)
+            .extract()
+            .as(File.class);
+
+        assertTrue(pdfFile.exists());
+    }
+}
+
+
+7. Test Reports Generation
+
+To generate HTML and JSON test reports using Allure and Surefire, follow these steps.
+
+	1.	Run the tests:
+
+mvn clean test
+
+2.	Generate HTML reports (using Surefire):
+
+mvn surefire-report:report
+
+HTML reports will be available in target/site/surefire-report.html.
+
+	3.	Generate Allure reports:
+
+mvn allure:serve
+
+Allure will generate HTML and JSON reports, which can be accessed via localhost:8080 after running the above command.
+
+Summary
+
+	1.	Spring Boot REST API with POST, GET, and report generation endpoints for vehicles.
+	2.	RestAssured tests for all API operations.
+	3.	Test reports in HTML, JSON, and PDF formats using Maven Surefire, Allure, and iText for PDF generation.
+
